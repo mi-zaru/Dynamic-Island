@@ -7,13 +7,13 @@ Text {
 
     property bool hovered: false
 
-    text: Qt.formatDateTime(clock.date, "h:mm AP")
+    text: Qt.formatDateTime(clock.date, "H:mm")
     color: "black"
 
     font {
         family: "SF Pro Display"
         letterSpacing: 2
-        pixelSize: hovered ? 26 : 16
+        pixelSize: hovered ? 26 : 17
         weight: 600
     }
 
