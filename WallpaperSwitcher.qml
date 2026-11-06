@@ -10,8 +10,10 @@ Item {
     signal launched()
     signal dismissed()
 
-    // ─────────────── CONFIG ───────────────
-    readonly property string wallpaperDir: "$HOME/Pictures/Wallpapers"
+    readonly property string textFont: "SF Pro Text"
+    readonly property string iconFont: "JetBrainsMono Nerd Font"
+
+    readonly property string wallpaperDir: "$HOME/Pictures/Wallpaper"
 
     readonly property int visibleApps:    5
     readonly property int thumbWidth:     160
@@ -30,13 +32,10 @@ Item {
     readonly property int rowHeight: thumbHeight + liftAmount
 
     readonly property int launcherWidth:
-        sidePadding * 2
-        + visibleApps * thumbWidth
-        + (visibleApps - 1) * thumbGap
+        sidePadding * 2 + visibleApps * thumbWidth + (visibleApps - 1) * thumbGap
 
     readonly property int launcherHeight:
-        topPadding + searchHeight + searchGap
-        + dividerHeight + dividerGap
+        topPadding + searchHeight + searchGap + dividerHeight + dividerGap
         + rowHeight + bottomPadding
 
     implicitWidth:  launcherWidth
@@ -44,7 +43,6 @@ Item {
     width:  implicitWidth
     height: implicitHeight
 
-    // ─────────────── STATE ───────────────
     property string searchText: ""
     property var wallpapers:   []
     property var filteredList: []
@@ -52,8 +50,8 @@ Item {
 
     property bool animateMoves: true
     property bool pendingCurrentQuery: false
+    property bool hasLoaded: false
 
-    // Basename of the wallpaper currently applied to the desktop.
     property string activeWallpaperName: ""
 
     Timer {
@@ -63,7 +61,6 @@ Item {
         onTriggered: root.animateMoves = true
     }
 
-    // ─────────────── SCAN ───────────────
     Process {
         id: listProc
         command: ["bash", "-c",
@@ -87,12 +84,12 @@ Item {
             root.wallpapers = buffer.slice()
             buffer = []
             root.rebuild()
+            root.hasLoaded = true
             if (root.pendingCurrentQuery) root.queryCurrent()
             else enableAnimTimer.restart()
         }
     }
 
-    // ─────────────── QUERY CURRENT WALLPAPER ───────────────
     Process {
         id: queryProc
         command: ["awww", "query"]
@@ -112,7 +109,6 @@ Item {
             const raw = queryProc.output.trim()
             queryProc.output = ""
 
-            // awww query format: ": DP-1: 1920x1080, /path/to/wall.jpg"
             let cur = raw
             const commaIdx = raw.lastIndexOf(", ")
             if (commaIdx >= 0) cur = raw.substring(commaIdx + 2).trim()
@@ -138,6 +134,7 @@ Item {
     }
 
     function refresh() {
+        hasLoaded = false
         listProc.running = false
         listProc.running = true
     }
@@ -158,7 +155,6 @@ Item {
         return dot > 0 ? name.substring(0, dot) : name
     }
 
-    // ─────────────── FILTER ───────────────
     function rebuild() {
         const query = searchText.trim().toLowerCase()
         const list = []
@@ -178,7 +174,6 @@ Item {
         currentIndex = 0
     }
 
-    // ─────────────── NAVIGATION ───────────────
     function moveSelection(delta) {
         const count = filteredList.length
         if (count === 0) return
@@ -188,7 +183,6 @@ Item {
         currentIndex = next
     }
 
-    // ─────────────── APPLY (awww only) ───────────────
     Process {
         id: setProc
         running: false
@@ -204,25 +198,21 @@ Item {
     function applyWallpaper(path) {
         if (!path) return
 
-        // Track active wallpaper immediately so the "never dim"
-        // rule kicks in before the next awww query.
         root.activeWallpaperName = root.baseName(path)
 
         setProc.command = [
             "awww", "img", path,
-            "--transition-type", "any",
+            "--transition-type", "fade",
             "--transition-step", "255",
-            "--transition-fps",  "60"
+            "--transition-duration", "1",
+            "--transition-fps", "75"
         ]
         setProc.running = true
 
         launched()
     }
 
-    // ─────────────── OPEN / CLOSE ───────────────
     function open() {
-        // Disable animations BEFORE touching currentIndex so the
-        // jump from the previous index doesn't animate visibly.
         animateMoves = false
         enableAnimTimer.stop()
 
@@ -238,11 +228,11 @@ Item {
     }
 
     function close() {
+        animateMoves = false
         searchText = ""
         currentIndex = 0
         pendingCurrentQuery = false
         enableAnimTimer.stop()
-        animateMoves = true
         focusGrabTimer.stop()
     }
 
@@ -265,13 +255,9 @@ Item {
 
     Component.onCompleted: refresh()
 
-    // ════════════════════════════════════════════════════════
-    //  CONTENT
-    // ════════════════════════════════════════════════════════
     Item {
         anchors.fill: parent
 
-        // ── SEARCH ──
         Item {
             id: searchArea
             anchors.left:  parent.left
@@ -289,7 +275,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 text: "󰍉"
                 color: "#555555"
-                font { family: "JetBrainsMono Nerd Font"; pixelSize: 19 }
+                font { family: root.iconFont; pixelSize: 19 }
             }
 
             TextInput {
@@ -307,7 +293,7 @@ Item {
                 clip: true
                 selectByMouse: true
                 verticalAlignment: TextInput.AlignVCenter
-                font { family: "SF Pro Display"; pixelSize: 13; weight: 500 }
+                font { family: root.textFont; pixelSize: 13; weight: 400 }
 
                 onTextChanged: {
                     if (root.searchText !== text) root.searchText = text
@@ -340,11 +326,10 @@ Item {
                 visible: searchInput.text.length === 0
                 text: "Search wallpapers"
                 color: "#777777"
-                font { family: "SF Pro Display"; pixelSize: 13; weight: 500 }
+                font { family: root.textFont; pixelSize: 13; weight: 400 }
             }
         }
 
-        // ── DIVIDER ──
         Rectangle {
             id: divider
             anchors.left:  parent.left
@@ -357,7 +342,6 @@ Item {
             color: "#d5d5d5"
         }
 
-        // ── CENTERED CAROUSEL ──
         Item {
             id: rowContainer
             anchors.left:  parent.left
@@ -410,8 +394,6 @@ Item {
 
                     z: 100 - absDistance
 
-                    // Active wallpaper stays full opacity, no matter
-                    // its distance from the current selection.
                     opacity: {
                         if (isActive) return 1.0
                         const d = absDistance
@@ -425,18 +407,25 @@ Item {
 
                     Behavior on x {
                         enabled: root.animateMoves
-                        NumberAnimation { duration: 420; easing.type: Easing.OutQuart }
+                        NumberAnimation {
+                            duration: 400
+                            easing.type: Easing.OutBack
+                            easing.overshoot: 1.4
+                        }
                     }
                     Behavior on y {
                         enabled: root.animateMoves
-                        NumberAnimation { duration: 420; easing.type: Easing.OutQuart }
+                        NumberAnimation {
+                            duration: 400
+                            easing.type: Easing.OutBack
+                            easing.overshoot: 1.4
+                        }
                     }
                     Behavior on opacity {
                         enabled: root.animateMoves
                         NumberAnimation { duration: 260; easing.type: Easing.OutCubic }
                     }
 
-                    // ── Thumbnail, rounded and masked ──
                     Rectangle {
                         id: thumbFrame
                         anchors.fill: parent
@@ -462,7 +451,6 @@ Item {
                             sourceSize.height: root.thumbHeight * 2
                         }
 
-                        // ── Filename treatment ──
                         Rectangle {
                             anchors.left:  parent.left
                             anchors.right: parent.right
@@ -500,27 +488,26 @@ Item {
                             elide: Text.ElideMiddle
                             horizontalAlignment: Text.AlignLeft
 
-                            // Active wallpaper has no gradient backdrop,
-                            // so outline keeps the text legible on any image.
                             style: delegateRoot.isActive
                                    ? Text.Outline : Text.Normal
                             styleColor: Qt.rgba(0, 0, 0, 0.55)
 
                             font {
-                                family: "SF Pro Display"
+                                family: root.textFont
                                 pixelSize: delegateRoot.isSelected ? 12 : 11
-                                weight:    delegateRoot.isSelected ? 700 : 500
-                                letterSpacing: 0.4
+                                weight:    delegateRoot.isSelected ? 600 : 500
+                                letterSpacing: 0.2
                             }
 
                             Behavior on font.pixelSize {
-                                NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+                                NumberAnimation {
+                                    duration: 260
+                                    easing.type: Easing.OutBack
+                                    easing.overshoot: 1.8
+                                }
                             }
                         }
                     }
-
-                    // No border ring — selection is conveyed by lift,
-                    // opacity falloff, and bolded filename.
 
                     MouseArea {
                         anchors.fill: parent
@@ -538,11 +525,11 @@ Item {
             Text {
                 anchors.centerIn: parent
                 visible: root.filteredList.length === 0
-                text: root.wallpapers.length === 0
+                text: !root.hasLoaded
                     ? "Loading wallpapers…"
                     : "No wallpapers found"
                 color: "#777777"
-                font { family: "SF Pro Display"; pixelSize: 12; weight: 500 }
+                font { family: root.textFont; pixelSize: 12; weight: 400 }
             }
         }
     }

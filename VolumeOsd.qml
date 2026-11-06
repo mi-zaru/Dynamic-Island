@@ -6,21 +6,44 @@ import QtQuick
 Item {
     id: volumeOsd
 
-    // ── Exposed to shell.qml ────────────────────────────────
+    // ── Fonts ──
+    readonly property string textFont: "SF Pro Text"
+    readonly property string iconFont: "JetBrainsMono Nerd Font"
+
     readonly property bool active: osdVisible
     readonly property real volume: audioSink && audioSink.audio ? audioSink.audio.volume : 0
     readonly property bool muted:  audioSink && audioSink.audio ? audioSink.audio.muted  : false
 
-    // ── Pipewire sink ───────────────────────────────────────
     PwObjectTracker {
         objects: [Pipewire.defaultAudioSink]
     }
     readonly property var audioSink: Pipewire.defaultAudioSink
 
-    // ── Visibility / auto-hide ──────────────────────────────
     property bool osdVisible: false
     property real _lastVolume: -1
     property bool _armed: false
+
+    property real pulseScale: 1.0
+
+    SequentialAnimation {
+        id: pulseAnim
+        NumberAnimation {
+            target: volumeOsd
+            property: "pulseScale"
+            to: 1.18
+            duration: 140
+            easing.type: Easing.OutBack
+            easing.overshoot: 2.5
+        }
+        NumberAnimation {
+            target: volumeOsd
+            property: "pulseScale"
+            to: 1.0
+            duration: 340
+            easing.type: Easing.OutBack
+            easing.overshoot: 1.6
+        }
+    }
 
     Timer {
         interval: 600
@@ -31,14 +54,13 @@ Item {
         }
     }
 
-    // Only a volume change triggers the OSD.
-    // Muting does NOT — the shell shows a mute glyph in idle instead.
     onVolumeChanged: {
         if (!_armed) return
         if (Math.abs(volume - _lastVolume) > 0.0005) {
             _lastVolume = volume
             osdVisible = true
             hideTimer.restart()
+            pulseAnim.restart()
         }
     }
 
@@ -48,20 +70,9 @@ Item {
         onTriggered: volumeOsd.osdVisible = false
     }
 
-    // ── Fade — matches the capsule's 260ms OutQuint ─────────
-        // ── Fade — smooth in, instant out ───────────────────────
-    // Fading out over time leaves the slider track partially
-    // visible while the capsule is still shrinking, which reads
-    // as a stray line. Showing is smooth; hiding is immediate.
     opacity: osdVisible ? 1 : 0
     visible: osdVisible
 
-    Behavior on opacity {
-        NumberAnimation {
-            duration: 260
-            easing.type: Easing.OutCubic
-        }
-    }
     Behavior on opacity {
         NumberAnimation {
             duration: osdVisible ? 260 : 160
@@ -69,12 +80,22 @@ Item {
         }
     }
 
-    // ── Speaker icon ────────────────────────────────────────
+    scale: osdVisible ? 1.0 : 0.90
+    Behavior on scale {
+        NumberAnimation {
+            duration: 320
+            easing.type: Easing.OutBack
+            easing.overshoot: 1.5
+        }
+    }
+
     Text {
         id: icon
         anchors.left: parent.left
         anchors.leftMargin: 18
         anchors.verticalCenter: parent.verticalCenter
+
+        scale: volumeOsd.pulseScale
 
         text: {
             if (volumeOsd.muted || volumeOsd.volume <= 0.001) return "󰝟"
@@ -84,12 +105,11 @@ Item {
         }
         color: "black"
         font {
-            family: "JetBrainsMono Nerd Font"
+            family: volumeOsd.iconFont
             pixelSize: 18
         }
     }
 
-    // ── Percentage ──────────────────────────────────────────
     Text {
         id: percent
         anchors.right: parent.right
@@ -98,17 +118,18 @@ Item {
         width: 40
         horizontalAlignment: Text.AlignRight
 
+        scale: volumeOsd.pulseScale
+
         text: Math.round(volumeOsd.volume * 100) + "%"
         color: "black"
         font {
-            family: "SF Pro Display"
+            family: volumeOsd.textFont
             pixelSize: 13
-            weight: 600
-            letterSpacing: 1
+            weight: 500
+            letterSpacing: 0
         }
     }
 
-    // ── Slider ──────────────────────────────────────────────
     Rectangle {
         id: track
         anchors.left: icon.right
@@ -128,7 +149,11 @@ Item {
             color: "#111111"
 
             Behavior on width {
-                NumberAnimation { duration: 110; easing.type: Easing.OutCubic }
+                NumberAnimation {
+                    duration: 260
+                    easing.type: Easing.OutBack
+                    easing.overshoot: 1.8
+                }
             }
         }
 

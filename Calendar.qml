@@ -5,10 +5,11 @@ import QtQuick
 Item {
     id: calendar
 
+    readonly property string textFont: "SF Pro Text"
+
     property bool expanded: false
     property bool showMonth: false
 
-    // Injected from shell.qml's single MouseArea:
     property int  hoveredCell:        -1
     property bool prevButtonHovered:  false
     property bool nextButtonHovered:  false
@@ -16,14 +17,12 @@ Item {
     readonly property bool miniVisible:  expanded && !showMonth
     readonly property bool monthVisible: expanded &&  showMonth
 
-    // ─── Colors ─────────────────────────────────────────────
     readonly property color weekendColor:    "#ff5f5f"
     readonly property color normalColor:     "#1a1a1a"
     readonly property color otherMonthColor: "#c4c4c4"
     readonly property color headerColor:     "#111111"
     readonly property color hoverBgColor:    "#e6e6e6"
 
-    // ─── Month navigation state ─────────────────────────────
     property int viewYear:  new Date().getFullYear()
     property int viewMonth: new Date().getMonth()
 
@@ -47,9 +46,6 @@ Item {
     }
     readonly property date today: systemClock.date
 
-    // ════════════════════════════════════════════════════════
-    //  MINI — 5-day strip
-    // ════════════════════════════════════════════════════════
     Item {
         id: miniView
         anchors.horizontalCenter: parent.horizontalCenter
@@ -60,8 +56,17 @@ Item {
         opacity: miniVisible ? 1 : 0
         visible: opacity > 0
 
+        scale: miniVisible ? 1.0 : 0.85
+
         Behavior on opacity {
             NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+        }
+        Behavior on scale {
+            NumberAnimation {
+                duration: 320
+                easing.type: Easing.OutBack
+                easing.overshoot: 1.6
+            }
         }
 
         Row {
@@ -102,9 +107,9 @@ Item {
                             color: isWeekend ? calendar.weekendColor : calendar.normalColor
                             opacity: fadeOpacity
                             font {
-                                family: "SF Pro Display"
+                                family: calendar.textFont
                                 pixelSize: isToday ? 14 : 10
-                                weight: isToday ? 700 : 500
+                                weight: isToday ? 600 : 400
                             }
                         }
                         Text {
@@ -113,9 +118,9 @@ Item {
                             color: isWeekend ? calendar.weekendColor : calendar.normalColor
                             opacity: fadeOpacity
                             font {
-                                family: "SF Pro Display"
+                                family: calendar.textFont
                                 pixelSize: isToday ? 15 : 11
-                                weight: isToday ? 700 : 500
+                                weight: isToday ? 600 : 500
                             }
                         }
                     }
@@ -124,17 +129,23 @@ Item {
         }
     }
 
-    // ════════════════════════════════════════════════════════
-    //  MONTH — full month grid
-    // ════════════════════════════════════════════════════════
     Item {
         id: monthView
         anchors.fill: parent
         opacity: monthVisible ? 1 : 0
         visible: opacity > 0
 
+        scale: monthVisible ? 1.0 : 0.92
+
         Behavior on opacity {
             NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+        }
+        Behavior on scale {
+            NumberAnimation {
+                duration: 320
+                easing.type: Easing.OutBack
+                easing.overshoot: 1.4
+            }
         }
 
         readonly property var gridModel: {
@@ -158,7 +169,6 @@ Item {
             return cells
         }
 
-        // ── Header (lifted up) ──────────────────────────────
         Item {
             id: headerRow
             anchors.top: parent.top
@@ -172,15 +182,14 @@ Item {
                 text: calendar.monthLabel
                 color: calendar.headerColor
                 font {
-                    family: "SF Pro Display"
+                    family: calendar.textFont
                     pixelSize: 16
-                    weight: 700
-                    letterSpacing: 0.5
+                    weight: 600
+                    letterSpacing: 0.3
                 }
             }
         }
 
-        // ── Content column (weekday + grid) — unchanged position ──
         Column {
             id: contentColumn
             anchors.top: parent.top
@@ -206,9 +215,9 @@ Item {
                             color: (index === 5 || index === 6)
                                    ? calendar.weekendColor : "#888888"
                             font {
-                                family: "SF Pro Display"
+                                family: calendar.textFont
                                 pixelSize: 11
-                                weight: 600
+                                weight: 500
                             }
                         }
                     }
@@ -229,27 +238,39 @@ Item {
                         width: grid.width / 7
                         height: (grid.height - 10) / 6
 
-                        // Lifted container so pill + digit look
-                        // truly centered in the cell.
                         Item {
                             anchors.centerIn: parent
                             width: 22
                             height: 22
 
-                            // Hover bg — current-month, non-today only
                             Rectangle {
                                 anchors.fill: parent
                                 radius: width / 2
                                 color: calendar.hoverBgColor
-                                opacity: (calendar.hoveredCell === index
-                                          && !modelData.isToday
-                                          && modelData.current) ? 1.0 : 0
+
+                                property bool active:
+                                    calendar.hoveredCell === index
+                                    && !modelData.isToday
+                                    && modelData.current
+
+                                opacity: active ? 1.0 : 0
+                                scale: active ? 1.0 : 0.55
+
                                 Behavior on opacity {
-                                    NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
+                                    NumberAnimation {
+                                        duration: 140
+                                        easing.type: Easing.OutCubic
+                                    }
+                                }
+                                Behavior on scale {
+                                    NumberAnimation {
+                                        duration: 260
+                                        easing.type: Easing.OutBack
+                                        easing.overshoot: 2.2
+                                    }
                                 }
                             }
 
-                            // Today bg
                             Rectangle {
                                 anchors.fill: parent
                                 radius: width / 2
@@ -267,9 +288,9 @@ Item {
                                 }
                                 opacity: modelData.current ? 1.0 : 0.85
                                 font {
-                                    family: "SF Pro Display"
+                                    family: calendar.textFont
                                     pixelSize: 12
-                                    weight: modelData.isToday ? 700 : 500
+                                    weight: modelData.isToday ? 600 : 500
                                 }
                             }
                         }
