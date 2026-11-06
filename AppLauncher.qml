@@ -9,7 +9,9 @@ Item {
     signal launched()
     signal dismissed()
 
-    // ─────────────── CONFIG ───────────────
+    readonly property string textFont: "SF Pro Text"
+    readonly property string iconFont: "JetBrainsMono Nerd Font"
+
     readonly property int launcherWidth: 400
     readonly property int visibleApps: 5
     readonly property int rowHeight: 38
@@ -22,7 +24,6 @@ Item {
     readonly property int topPadding: 8
     readonly property int bottomPadding: 10
 
-    // ─────────────── DYNAMIC HEIGHT ───────────────
     readonly property int resultCount: appList.length
     readonly property int visibleCount: Math.min(resultCount, visibleApps)
 
@@ -36,22 +37,17 @@ Item {
         + dividerHeight + dividerGap
         + appListHeight + bottomPadding
 
-    // No Behavior on our own height. The capsule in shell.qml owns the
-    // single source of height animation; our content is top-anchored so
-    // an instantaneous size change is invisible.
     implicitWidth: launcherWidth
     implicitHeight: launcherHeight
     width: implicitWidth
     height: implicitHeight
 
-    // ─────────────── STATE ───────────────
     property string searchText: ""
     property int currentIndex: 0
     property var usage: ({ })
     property var appList: []
     property bool hasLoaded: false
 
-    // ─────────────── USAGE PERSISTENCE ───────────────
     FileView {
         id: usageFile
         path: Quickshell.statePath("app-usage.json")
@@ -103,7 +99,6 @@ Item {
         usageFile.setText(JSON.stringify(usage, null, 2))
     }
 
-    // ─────────────── SEARCH SCORING ───────────────
     function isBoundary(str, idx) {
         if (idx === 0) return true
         const c = str.charCodeAt(idx - 1)
@@ -153,7 +148,6 @@ Item {
         return best
     }
 
-    // ─────────────── MODEL REBUILD ───────────────
     function rebuild() {
         const entries = [...DesktopEntries.applications.values]
         const hasQuery = searchText.trim().length > 0
@@ -189,7 +183,6 @@ Item {
             appListView.positionViewAtBeginning()
     }
 
-    // ─────────────── NAVIGATION ───────────────
     function moveSelection(delta) {
         const count = appList.length
         if (count === 0) return
@@ -206,7 +199,6 @@ Item {
         launchApp(appList[idx])
     }
 
-    // ─────────────── OPEN / CLOSE / LAUNCH ───────────────
     function open() {
         searchText = ""
         currentIndex = 0
@@ -227,28 +219,18 @@ Item {
         launched()
     }
 
-    // ─────────────── TIMERS ───────────────
     Timer {
         id: focusGrabTimer
         interval: 40
         repeat: true
         running: false
         property int attempts: 0
-
         onTriggered: {
             attempts++
-            if (!root.visible || attempts > 25) {
-                stop()
-                attempts = 0
-                return
-            }
-            if (!searchInput.activeFocus)
-                searchInput.forceActiveFocus()
+            if (!root.visible || attempts > 25) { stop(); attempts = 0; return }
+            if (!searchInput.activeFocus) searchInput.forceActiveFocus()
         }
-
-        onRunningChanged: {
-            if (running) attempts = 0
-        }
+        onRunningChanged: { if (running) attempts = 0 }
     }
 
     Timer {
@@ -257,7 +239,6 @@ Item {
         running: !root.hasLoaded
         repeat: true
         property int attempts: 0
-
         onTriggered: {
             attempts++
             root.rebuild()
@@ -270,11 +251,9 @@ Item {
 
     Component.onCompleted: rebuild()
 
-    // ─────────────── CONTENT ───────────────
     Item {
         anchors.fill: parent
 
-        // ─── SEARCH ───
         Item {
             id: searchArea
             anchors.left: parent.left
@@ -292,7 +271,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 text: "󰍉"
                 color: "#555555"
-                font { family: "JetBrainsMono Nerd Font"; pixelSize: 19 }
+                font { family: root.iconFont; pixelSize: 19 }
             }
 
             TextInput {
@@ -310,7 +289,7 @@ Item {
                 clip: true
                 selectByMouse: true
                 verticalAlignment: TextInput.AlignVCenter
-                font { family: "SF Pro Display"; pixelSize: 13; weight: 500 }
+                font { family: root.textFont; pixelSize: 13; weight: 400 }
 
                 onTextChanged: {
                     if (root.searchText !== text) root.searchText = text
@@ -341,11 +320,10 @@ Item {
                 visible: searchInput.text.length === 0
                 text: "Search applications"
                 color: "#777777"
-                font { family: "SF Pro Display"; pixelSize: 13; weight: 500 }
+                font { family: root.textFont; pixelSize: 13; weight: 400 }
             }
         }
 
-        // ─── DIVIDER ───
         Rectangle {
             id: divider
             anchors.left: parent.left
@@ -358,7 +336,6 @@ Item {
             color: "#d5d5d5"
         }
 
-        // ─── LIST ───
         Item {
             id: listContainer
             anchors.left: parent.left
@@ -369,6 +346,14 @@ Item {
             anchors.topMargin: root.dividerGap
             height: root.appListHeight
             clip: true
+
+            Behavior on height {
+                NumberAnimation {
+                    duration: 380
+                    easing.type: Easing.OutBack
+                    easing.overshoot: 1.15
+                }
+            }
 
             ListView {
                 id: appListView
@@ -437,6 +422,15 @@ Item {
                         radius: 7
                         color: "#e5e5e5"
 
+                        scale: delegateRoot.selected ? 1.08 : 1.0
+                        Behavior on scale {
+                            NumberAnimation {
+                                duration: 260
+                                easing.type: Easing.OutBack
+                                easing.overshoot: 2.0
+                            }
+                        }
+
                         readonly property string resolvedIcon: {
                             if (app.icon && app.icon.length > 0) {
                                 const p = Quickshell.iconPath(app.icon, true)
@@ -472,13 +466,12 @@ Item {
 
                         Text {
                             anchors.centerIn: parent
-                            visible: appIcon.source === ""
-                                || appIcon.status === Image.Error
+                            visible: appIcon.source === "" || appIcon.status === Image.Error
                             text: app.name && app.name.length > 0
                                 ? app.name.charAt(0).toUpperCase()
                                 : "?"
                             color: "#111111"
-                            font { family: "SF Pro Display"; pixelSize: 13; weight: 600 }
+                            font { family: root.textFont; pixelSize: 13; weight: 500 }
                         }
                     }
 
@@ -492,7 +485,7 @@ Item {
                         color: "#111111"
                         verticalAlignment: Text.AlignVCenter
                         elide: Text.ElideRight
-                        font { family: "SF Pro Display"; pixelSize: 13; weight: 500 }
+                        font { family: root.textFont; pixelSize: 13; weight: 500 }
                     }
 
                     MouseArea {
@@ -513,7 +506,7 @@ Item {
                     ? "No applications found"
                     : "No applications"
                 color: "#777777"
-                font { family: "SF Pro Display"; pixelSize: 12; weight: 500 }
+                font { family: root.textFont; pixelSize: 12; weight: 400 }
             }
         }
     }

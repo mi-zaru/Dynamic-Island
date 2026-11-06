@@ -10,169 +10,198 @@ import "widgets"
 
 ShellRoot {
 
+    readonly property string textFont: "SF Pro Text"
+    readonly property string iconFont: "JetBrainsMono Nerd Font"
+
     // ─────────────── IPC ───────────────
     IpcHandler {
         target: "appLauncher"
-
         function toggle(): void {
-            // ◀── CHANGED — close wallpaper mode when opening launcher
-            panel.wallpaperMode = false
-            wallpaperSwitcher.close()
-
+            panel.wallpaperMode = false; wallpaperSwitcher.close()
+            panel.emojiMode = false; emojiPicker.close()
+            panel.powerMode = false; powerMenu.close()
             panel.launcherMode = !panel.launcherMode
             panel.clicked = false
             if (panel.launcherMode) appLauncher.open()
             else appLauncher.close()
         }
-
         function close(): void {
-            panel.launcherMode = false
-            panel.clicked = false
+            panel.launcherMode = false; panel.clicked = false
             appLauncher.close()
         }
     }
 
-    // ◀── NEW — wallpaper switcher IPC
     IpcHandler {
         target: "wallpaperSwitcher"
-
         function toggle(): void {
-            // close launcher when opening wallpaper switcher
-            panel.launcherMode = false
-            appLauncher.close()
-
+            panel.launcherMode = false; appLauncher.close()
+            panel.emojiMode = false; emojiPicker.close()
+            panel.powerMode = false; powerMenu.close()
             panel.wallpaperMode = !panel.wallpaperMode
             panel.clicked = false
             if (panel.wallpaperMode) wallpaperSwitcher.open()
             else wallpaperSwitcher.close()
         }
-
         function close(): void {
-            panel.wallpaperMode = false
-            panel.clicked = false
+            panel.wallpaperMode = false; panel.clicked = false
             wallpaperSwitcher.close()
         }
     }
 
-    // ─────────────── PANEL ───────────────
+    IpcHandler {
+        target: "emojiPicker"
+        function toggle(): void {
+            panel.launcherMode = false; appLauncher.close()
+            panel.wallpaperMode = false; wallpaperSwitcher.close()
+            panel.powerMode = false; powerMenu.close()
+            panel.emojiMode = !panel.emojiMode
+            panel.clicked = false
+            if (panel.emojiMode) emojiPicker.open()
+            else emojiPicker.close()
+        }
+        function close(): void {
+            panel.emojiMode = false; panel.clicked = false
+            emojiPicker.close()
+        }
+    }
+
+    IpcHandler {
+        target: "powerMenu"
+        function toggle(): void {
+            panel.launcherMode = false; appLauncher.close()
+            panel.wallpaperMode = false; wallpaperSwitcher.close()
+            panel.emojiMode = false; emojiPicker.close()
+            panel.powerMode = !panel.powerMode
+            panel.clicked = false
+            if (panel.powerMode) powerMenu.open()
+            else powerMenu.close()
+        }
+        function close(): void {
+            panel.powerMode = false; panel.clicked = false
+            powerMenu.close()
+        }
+    }
+
     PanelWindow {
         id: panel
 
         property bool hovered: false
         property bool clicked: false
         property bool launcherMode: false
-        property bool wallpaperMode: false           // ◀── NEW
+        property bool wallpaperMode: false
+        property bool emojiMode: false
+        property bool powerMode: false
 
-        // ◀── CHANGED — exclude wallpaperMode from month mode
         readonly property bool monthMode:
-            hovered && clicked && !launcherMode && !wallpaperMode
+            hovered && clicked
+            && !launcherMode && !wallpaperMode && !emojiMode && !powerMode
 
-        implicitWidth: 1000
-        implicitHeight: 420
+        implicitWidth: 1200
+        implicitHeight: 480
         aboveWindows: true
         exclusiveZone: 40
-
         focusable: true
 
-        // ◀── CHANGED — keyboard focus for wallpaper mode
         WlrLayershell.keyboardFocus:
-            (panel.launcherMode || panel.wallpaperMode)
-                ? WlrKeyboardFocus.Exclusive
-                : WlrKeyboardFocus.None
+            (panel.launcherMode || panel.wallpaperMode || panel.emojiMode || panel.powerMode)
+                ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
-        // ◀── CHANGED — overlay layer for wallpaper mode
         WlrLayershell.layer:
-            (panel.launcherMode || panel.wallpaperMode)
-                ? WlrLayer.Overlay
-                : WlrLayer.Top
+            (panel.launcherMode || panel.wallpaperMode || panel.emojiMode || panel.powerMode)
+                ? WlrLayer.Overlay : WlrLayer.Top
 
         anchors { top: true }
         margins { top: 10; bottom: 5 }
         color: "transparent"
 
+        mask: Region {
+            Region {
+                x: capsule.x; y: capsule.y
+                width: capsule.width; height: capsule.height
+            }
+            Region {
+                x: musicPlayer.x; y: musicPlayer.y
+                width: musicPlayer.spotifyRunning ? musicPlayer.width : 0
+                height: musicPlayer.spotifyRunning ? musicPlayer.height : 0
+            }
+        }
+
         onLauncherModeChanged: {
             if (launcherMode) Qt.callLater(function() { appLauncher.open() })
             else appLauncher.close()
         }
-
-        // ◀── NEW — drive open/close of the wallpaper switcher
         onWallpaperModeChanged: {
             if (wallpaperMode) Qt.callLater(function() { wallpaperSwitcher.open() })
             else wallpaperSwitcher.close()
+        }
+        onEmojiModeChanged: {
+            if (emojiMode) Qt.callLater(function() { emojiPicker.open() })
+            else emojiPicker.close()
+        }
+        onPowerModeChanged: {
+            if (powerMode) Qt.callLater(function() { powerMenu.open() })
+            else powerMenu.close()
         }
 
         Item {
             id: mainRow
             anchors.fill: parent
 
-            // ─── CAPSULE ───
             Rectangle {
                 id: capsule
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.top: parent.top
+                z: 5
 
-                readonly property int idleWidth: 130
-                readonly property int idleHeight: 37
+                readonly property int normalIdleWidth: 110
+                readonly property int idleHeight: 33
                 readonly property int hoverWidth: 300
                 readonly property int hoverHeight: 120
                 readonly property int monthWidth: 320
                 readonly property int monthHeight: 246
                 readonly property int volumeWidth: 260
-                readonly property int bothIconsWidth: 165
 
                 readonly property bool volumeMode: volumeOsd.active
-
                 readonly property bool workspaceMode:
                     workspaceOsd.active && !panel.hovered
                     && !volumeMode && !panel.launcherMode
-                    && !panel.wallpaperMode                          // ◀── CHANGED
+                    && !panel.wallpaperMode && !panel.emojiMode
+                    && !panel.powerMode
 
-                readonly property bool showMuteIcon:
-                    volumeOsd.muted && !panel.hovered && !volumeMode
-                    && !workspaceOsd.active && !panel.launcherMode
-                    && !panel.wallpaperMode                          // ◀── CHANGED
+                readonly property bool showOfflineIcon:
+                    networkStatus.checked && !networkStatus.online
+                    && !panel.monthMode && !volumeMode
+                    && !panel.launcherMode && !panel.wallpaperMode
+                    && !panel.emojiMode && !panel.powerMode
+                    && !workspaceOsd.active
 
-                readonly property bool showNotifIcon:
-                    notifications.active && !panel.hovered && !volumeMode
-                    && !workspaceOsd.active && !panel.launcherMode
-                    && !panel.wallpaperMode                          // ◀── CHANGED
-
-                readonly property bool showBothIcons: showMuteIcon && showNotifIcon
-
-                readonly property real iconGap: 10
-                readonly property real muteIconW: muteIcon.implicitWidth
-                readonly property real notifIconW: notifIcon.implicitWidth
-
+                readonly property real iconGap: 8
+                readonly property real offlineIconW: Math.max(offlineIcon.implicitWidth, 20)
                 readonly property real trailingW:
-                    (showMuteIcon ? iconGap + muteIconW : 0)
-                    + (showNotifIcon ? iconGap + notifIconW : 0)
-
+                    showOfflineIcon ? (iconGap + offlineIconW) : 0
                 readonly property int workspaceWidth:
-                    Math.max(idleWidth, Math.round(workspaceLabel.implicitWidth + 56))
+                    Math.max(normalIdleWidth, Math.round(workspaceLabel.implicitWidth + 56))
+                readonly property int idleWidth:
+                    showOfflineIcon
+                        ? (normalIdleWidth + Math.round(iconGap + offlineIconW))
+                        : normalIdleWidth
 
-                // ◀── CHANGED — add wallpaper branch
-                width: volumeMode
-                    ? volumeWidth
-                    : panel.launcherMode
-                        ? appLauncher.implicitWidth
-                        : panel.wallpaperMode
-                            ? wallpaperSwitcher.implicitWidth
-                            : panel.monthMode
-                                ? monthWidth
-                                : panel.hovered
-                                    ? hoverWidth
-                                    : workspaceMode
-                                        ? workspaceWidth
-                                        : (showBothIcons ? bothIconsWidth : idleWidth)
+                width: volumeMode ? volumeWidth
+                    : panel.launcherMode ? appLauncher.implicitWidth
+                    : panel.wallpaperMode ? wallpaperSwitcher.implicitWidth
+                    : panel.emojiMode ? emojiPicker.implicitWidth
+                    : panel.powerMode ? powerMenu.implicitWidth
+                    : panel.monthMode ? monthWidth
+                    : panel.hovered ? hoverWidth
+                    : workspaceMode ? workspaceWidth
+                    : idleWidth
 
-                // ◀── CHANGED — add wallpaper branch
-                height: panel.monthMode
-                    ? monthHeight
-                    : panel.launcherMode
-                        ? appLauncher.implicitHeight
-                        : panel.wallpaperMode
-                            ? wallpaperSwitcher.implicitHeight
-                            : panel.hovered ? hoverHeight : idleHeight
+                height: panel.monthMode ? monthHeight
+                    : panel.launcherMode ? appLauncher.implicitHeight
+                    : panel.wallpaperMode ? wallpaperSwitcher.implicitHeight
+                    : panel.emojiMode ? emojiPicker.implicitHeight
+                    : panel.powerMode ? powerMenu.implicitHeight
+                    : panel.hovered ? hoverHeight : idleHeight
 
                 radius: 20
                 color: "white"
@@ -180,13 +209,20 @@ ShellRoot {
                 clip: true
 
                 Behavior on width {
-                    NumberAnimation { duration: 260; easing.type: Easing.OutQuint }
+                    NumberAnimation {
+                        duration: 420
+                        easing.type: Easing.OutBack
+                        easing.overshoot: 1.10
+                    }
                 }
                 Behavior on height {
-                    NumberAnimation { duration: 260; easing.type: Easing.OutQuint }
+                    NumberAnimation {
+                        duration: 420
+                        easing.type: Easing.OutBack
+                        easing.overshoot: 1.10
+                    }
                 }
 
-                // ─── CAPSULE MOUSE AREA ───
                 MouseArea {
                     id: capsuleArea
                     anchors.fill: parent
@@ -196,12 +232,10 @@ ShellRoot {
                     readonly property int btnH: 26
                     readonly property int btnX: 12
                     readonly property int btnY: 6
-
                     readonly property bool overPrevBtn:
                         panel.monthMode && !capsule.volumeMode
                         && mouseX >= btnX && mouseX <= btnX + btnW
                         && mouseY >= btnY && mouseY <= btnY + btnH
-
                     readonly property bool overNextBtn:
                         panel.monthMode && !capsule.volumeMode
                         && mouseX >= capsule.width - btnX - btnW
@@ -210,7 +244,6 @@ ShellRoot {
 
                     readonly property int hoveredCell: {
                         if (!panel.monthMode || capsule.volumeMode) return -1
-
                         const calW = 276
                         const calX = (capsule.width - calW) / 2
                         const calY = 12
@@ -218,13 +251,9 @@ ShellRoot {
                         const gridY = calY + 62
                         const gridW = calW
                         const gridH = (capsule.height - 24) - 62
-
                         const gx = mouseX - gridX
                         const gy = mouseY - gridY
-
-                        if (gx < 0 || gx >= gridW || gy < 0 || gy >= gridH)
-                            return -1
-
+                        if (gx < 0 || gx >= gridW || gy < 0 || gy >= gridH) return -1
                         const cellW = gridW / 7
                         const cellH = (gridH - 10) / 6
                         const col = Math.floor(gx / cellW)
@@ -234,147 +263,114 @@ ShellRoot {
                     }
 
                     onEntered: panel.hovered = true
-
-                    onExited: {
-                        panel.hovered = false
-                        panel.clicked = false
-                    }
-
-                    onPositionChanged: {
-                        if (mouseX < 0 || mouseY < 0
-                            || mouseX > width || mouseY > height) {
-                            panel.hovered = false
-                            panel.clicked = false
-                        }
-                    }
-
+                    onExited: { panel.hovered = false; panel.clicked = false }
                     onClicked: {
-                        // ◀── CHANGED — don't toggle click state in fullscreen modes
-                        if (panel.launcherMode || panel.wallpaperMode) return
+                        if (panel.launcherMode || panel.wallpaperMode
+                            || panel.emojiMode || panel.powerMode) return
                         if (overPrevBtn) { calendar.prevMonth(); return }
                         if (overNextBtn) { calendar.nextMonth(); return }
                         if (panel.hovered) panel.clicked = !panel.clicked
                     }
                 }
 
-                // ─── CLOCK ───
                 Clock {
                     id: clock
-
                     property real _shift: -capsule.trailingW / 2
                     Behavior on _shift {
-                        NumberAnimation { duration: 500; easing.type: Easing.OutQuart }
+                        NumberAnimation {
+                            duration: 380
+                            easing.type: Easing.OutBack
+                            easing.overshoot: 1.15
+                        }
                     }
-
                     x: capsule.width / 2 - width / 2 + _shift
-
-                    // ◀── CHANGED — hide during wallpaper mode
                     opacity: (panel.monthMode || panel.launcherMode
                         || capsule.volumeMode || workspaceOsd.active
-                        || panel.wallpaperMode) ? 0 : 1
+                        || panel.wallpaperMode || panel.emojiMode
+                        || panel.powerMode) ? 0 : 1
                     visible: opacity > 0.01
                     Behavior on opacity {
                         NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
                     }
-
                     property real centerY: panel.hovered
-                        ? capsule.hoverHeight * 0.3
-                        : capsule.idleHeight / 2
+                        ? capsule.hoverHeight * 0.3 : capsule.idleHeight / 2
                     y: centerY - height / 2
                     Behavior on centerY {
-                        NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+                        NumberAnimation {
+                            duration: 380
+                            easing.type: Easing.OutBack
+                            easing.overshoot: 1.15
+                        }
                     }
-
                     hovered: panel.hovered && !panel.monthMode
                         && !panel.launcherMode && !panel.wallpaperMode
-                        && !capsule.volumeMode
+                        && !panel.emojiMode && !capsule.volumeMode
+                        && !panel.powerMode
                 }
 
-                // ─── WORKSPACE LABEL ───
                 Text {
                     id: workspaceLabel
-
                     text: workspaceOsd.workspaceId > 0
-                        ? "Workspace " + workspaceOsd.workspaceId
-                        : ""
+                        ? "Workspace " + workspaceOsd.workspaceId : ""
 
                     property real _shift: -capsule.trailingW / 2
                     Behavior on _shift {
-                        NumberAnimation { duration: 500; easing.type: Easing.OutQuart }
+                        NumberAnimation {
+                            duration: 380
+                            easing.type: Easing.OutBack
+                            easing.overshoot: 1.15
+                        }
                     }
-
                     x: capsule.width / 2 - width / 2 + _shift
-
                     property real centerY: panel.hovered
-                        ? capsule.hoverHeight * 0.3
-                        : capsule.idleHeight / 2
+                        ? capsule.hoverHeight * 0.3 : capsule.idleHeight / 2
                     y: centerY - height / 2
                     Behavior on centerY {
-                        NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+                        NumberAnimation {
+                            duration: 380
+                            easing.type: Easing.OutBack
+                            easing.overshoot: 1.15
+                        }
                     }
 
                     color: "black"
                     font {
-                        family: "SF Pro Display"
-                        letterSpacing: 2
+                        family: root.textFont
+                        letterSpacing: 0
                         pixelSize: 17
-                        weight: 600
+                        weight: 500
                     }
-
-                    // ◀── CHANGED — hide during wallpaper mode
                     opacity: (workspaceOsd.active && !panel.monthMode
                         && !panel.launcherMode && !panel.wallpaperMode
-                        && !capsule.volumeMode) ? 1 : 0
+                        && !panel.emojiMode && !capsule.volumeMode
+                        && !panel.powerMode) ? 1 : 0
                     visible: opacity > 0.01
                     Behavior on opacity {
                         NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
                     }
                 }
 
-                // ─── MUTE ICON ───
                 Text {
-                    id: muteIcon
-                    text: "󰝟"
+                    id: offlineIcon
+                    text: "󰖪"
                     color: "black"
-                    font { family: "JetBrainsMono Nerd Font"; pixelSize: 20 }
+                    font { family: root.iconFont; pixelSize: 20 }
+                    width: capsule.offlineIconW
+                    horizontalAlignment: Text.AlignHCenter
                     x: clock.x + clock.width + capsule.iconGap
-                    opacity: capsule.showMuteIcon ? 1 : 0
+                    anchors.verticalCenter: clock.verticalCenter
+                    opacity: capsule.showOfflineIcon ? 1 : 0
                     visible: opacity > 0.01
                     Behavior on opacity {
                         NumberAnimation { duration: 320; easing.type: Easing.OutCubic }
                     }
-                    anchors.verticalCenter: parent.verticalCenter
                 }
 
-                // ─── NOTIFICATION ICON ───
-                Text {
-                    id: notifIcon
-                    text: "󰂞"
-                    color: "black"
-                    font { family: "JetBrainsMono Nerd Font"; pixelSize: 18 }
-
-                    property real _localShift: capsule.showMuteIcon
-                        ? capsule.muteIconW + capsule.iconGap
-                        : 0
-                    Behavior on _localShift {
-                        NumberAnimation { duration: 500; easing.type: Easing.OutQuart }
-                    }
-
-                    x: clock.x + clock.width + capsule.iconGap + _localShift
-                    opacity: capsule.showNotifIcon ? 1 : 0
-                    visible: opacity > 0.01
-                    Behavior on opacity {
-                        NumberAnimation { duration: 320; easing.type: Easing.OutCubic }
-                    }
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-
-                // ─── CALENDAR ───
                 Calendar {
                     id: calendar
-                    // ◀── CHANGED — exclude wallpaper mode
                     expanded: panel.hovered && !capsule.volumeMode
                         && !panel.launcherMode && !panel.wallpaperMode
+                        && !panel.emojiMode && !panel.powerMode
                     showMonth: panel.monthMode
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.top: parent.top
@@ -386,53 +382,70 @@ ShellRoot {
                     nextButtonHovered: capsuleArea.overNextBtn
                 }
 
-                // ─── APP LAUNCHER ───
                 AppLauncher {
                     id: appLauncher
                     visible: panel.launcherMode && !capsule.volumeMode
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.top: parent.top
                     z: 100
-
                     function closeAll() {
-                        panel.launcherMode = false
-                        panel.clicked = false
+                        panel.launcherMode = false; panel.clicked = false
                         appLauncher.close()
                     }
-
                     onLaunched:  closeAll()
                     onDismissed: closeAll()
                 }
 
-                // ◀── NEW — WALLPAPER SWITCHER ─────────────────────
                 WallpaperSwitcher {
                     id: wallpaperSwitcher
                     visible: panel.wallpaperMode && !capsule.volumeMode
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.top: parent.top
                     z: 100
-
                     function closeAll() {
-                        panel.wallpaperMode = false
-                        panel.clicked = false
+                        panel.wallpaperMode = false; panel.clicked = false
                         wallpaperSwitcher.close()
                     }
-
                     onLaunched:  closeAll()
                     onDismissed: closeAll()
                 }
 
-                // ─── PREV MONTH BUTTON ───
+                EmojiPicker {
+                    id: emojiPicker
+                    visible: panel.emojiMode && !capsule.volumeMode
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.top: parent.top
+                    z: 100
+                    function closeAll() {
+                        panel.emojiMode = false; panel.clicked = false
+                        emojiPicker.close()
+                    }
+                    onSelected:  closeAll()
+                    onDismissed: closeAll()
+                }
+
+                PowerMenu {
+                    id: powerMenu
+                    visible: panel.powerMode && !capsule.volumeMode
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.top: parent.top
+                    z: 100
+                    function closeAll() {
+                        panel.powerMode = false; panel.clicked = false
+                        powerMenu.close()
+                    }
+                    onDismissed: closeAll()
+                }
+
                 Item {
                     id: prevButton
-                    visible: panel.monthMode && !capsule.volumeMode
+                    visible: panel.monthMode && !capsule.volumeMode && !panel.powerMode
                     anchors.left: parent.left
                     anchors.top: parent.top
                     anchors.leftMargin: 6
                     anchors.topMargin: 6
                     width: 26
                     height: 26
-
                     Rectangle {
                         anchors.fill: parent
                         radius: width / 2
@@ -442,27 +455,24 @@ ShellRoot {
                             NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
                         }
                     }
-
                     Text {
                         anchors.centerIn: parent
                         anchors.verticalCenterOffset: -1
                         text: "‹"
                         color: "#111111"
-                        font { family: "SF Pro Display"; pixelSize: 18; weight: 600 }
+                        font { family: root.textFont; pixelSize: 18; weight: 500 }
                     }
                 }
 
-                // ─── NEXT MONTH BUTTON ───
                 Item {
                     id: nextButton
-                    visible: panel.monthMode && !capsule.volumeMode
+                    visible: panel.monthMode && !capsule.volumeMode && !panel.powerMode
                     anchors.right: parent.right
                     anchors.top: parent.top
                     anchors.rightMargin: 6
                     anchors.topMargin: 6
                     width: 26
                     height: 26
-
                     Rectangle {
                         anchors.fill: parent
                         radius: width / 2
@@ -472,17 +482,15 @@ ShellRoot {
                             NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
                         }
                     }
-
                     Text {
                         anchors.centerIn: parent
                         anchors.verticalCenterOffset: -1
                         text: "›"
                         color: "#111111"
-                        font { family: "SF Pro Display"; pixelSize: 18; weight: 600 }
+                        font { family: root.textFont; pixelSize: 18; weight: 500 }
                     }
                 }
 
-                // ─── VOLUME OSD ───
                 VolumeOsd {
                     id: volumeOsd
                     anchors.top: parent.top
@@ -492,17 +500,17 @@ ShellRoot {
                 }
             }
 
-            // ─── SIDE COMPONENTS ───
-            Notifications { id: notifications }
             WorkspaceOsd { id: workspaceOsd }
+            NetCheck { id: networkStatus }
 
             MusicPlayer {
                 id: musicPlayer
                 anchors.right: capsule.left
-                anchors.rightMargin: musicPlayer.spotifyRunning ? 8 : 0
+                anchors.rightMargin: 8
                 anchors.top: parent.top
-                Behavior on anchors.rightMargin {
-                    NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+                z: 1
+                transform: Translate {
+                    x: musicPlayer.slideProgress * (musicPlayer.collapsedSize + 20)
                 }
             }
         }

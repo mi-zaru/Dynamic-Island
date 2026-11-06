@@ -8,6 +8,10 @@ import Qt5Compat.GraphicalEffects
 Item {
     id: musicPlayer
 
+    // ── Fonts ──
+    readonly property string textFont: "SF Pro Text"
+    readonly property string iconFont: "JetBrainsMono Nerd Font"
+
     readonly property color bgColor: "white"
     readonly property color fgColor: "black"
     readonly property color accent:  '#343434'
@@ -24,7 +28,6 @@ Item {
 
     readonly property bool spotifyRunning: spotifyPlayer !== null
     readonly property bool isPlaying: spotifyPlayer ? spotifyPlayer.isPlaying : false
-
     readonly property real length: spotifyPlayer ? (spotifyPlayer.length || 0) : 0
 
     property real displayPosition: 0
@@ -34,21 +37,49 @@ Item {
 
     property bool hovered: false
 
-    readonly property int collapsedSize: 37
+    readonly property int collapsedSize: 33
     readonly property int expandedWidth: 340
     readonly property int expandedHeight: 120
     readonly property int padding: 7
     readonly property int rightPadding: 14
 
-    implicitWidth:  !spotifyRunning ? 0 : (hovered ? expandedWidth  : collapsedSize)
-    implicitHeight: !spotifyRunning ? 0 : (hovered ? expandedHeight : collapsedSize)
+    property real slideProgress: spotifyRunning ? 0 : 1
 
-    visible: opacity > 0
-    opacity: spotifyRunning ? 1 : 0
+    Behavior on slideProgress {
+        NumberAnimation {
+            duration: 440
+            easing.type: Easing.OutBack
+            easing.overshoot: 1.2
+        }
+    }
 
-    Behavior on implicitWidth  { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
-    Behavior on implicitHeight { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
-    Behavior on opacity        { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+    scale: 1.0 - Math.max(0, slideProgress - 0.5) * 0.6
+    Behavior on scale {
+        NumberAnimation {
+            duration: 440
+            easing.type: Easing.OutBack
+            easing.overshoot: 1.2
+        }
+    }
+
+    opacity: slideProgress > 0.8
+        ? Math.max(0, 1 - (slideProgress - 0.8) * 5)
+        : 1
+    Behavior on opacity {
+        NumberAnimation { duration: 80; easing.type: Easing.OutCubic }
+    }
+
+    visible: spotifyRunning || slideProgress < 0.99
+
+    implicitWidth:  hovered ? expandedWidth  : collapsedSize
+    implicitHeight: hovered ? expandedHeight : collapsedSize
+
+    Behavior on implicitWidth {
+        SpringAnimation { spring: 7; damping: 0.6; epsilon: 0.5 }
+    }
+    Behavior on implicitHeight {
+        SpringAnimation { spring: 7; damping: 0.6; epsilon: 0.5 }
+    }
 
     function formatTime(sec) {
         if (!sec || sec < 0 || !isFinite(sec)) return "0:00"
@@ -100,9 +131,9 @@ Item {
         id: container
         anchors.fill: parent
 
-        radius: musicPlayer.hovered ? 20 : 18.5
+        radius: musicPlayer.hovered ? 20 : 16.5
         Behavior on radius {
-            NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+            SpringAnimation { spring: 7; damping: 0.6; epsilon: 0.1 }
         }
 
         color: musicPlayer.bgColor
@@ -117,9 +148,6 @@ Item {
             onExited:  musicPlayer.hovered = false
         }
 
-        // ════════════════════════════════════════════════════════
-        //  EXPANDED — album pinned left, info column right
-        // ════════════════════════════════════════════════════════
         Item {
             id: expandedContent
             width: musicPlayer.expandedWidth
@@ -133,7 +161,6 @@ Item {
                 NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
             }
 
-            // ── Album ────────────────────────────────────────────
             Rectangle {
                 id: expandedAlbumContainer
                 anchors.left: parent.left
@@ -156,9 +183,9 @@ Item {
                         anchors.centerIn: parent
                         text: "♪"
                         color: musicPlayer.fgColor
-                        font.family: "SF Pro Display"
+                        font.family: musicPlayer.textFont
                         font.pixelSize: Math.round(parent.height * 0.4)
-                        font.weight: 600
+                        font.weight: 500
                     }
                 }
 
@@ -185,7 +212,6 @@ Item {
                 }
             }
 
-            // ── Info column ──────────────────────────────────────
             Column {
                 anchors.left: expandedAlbumContainer.right
                 anchors.leftMargin: 12
@@ -200,9 +226,9 @@ Item {
                         ? (musicPlayer.spotifyPlayer.trackTitle || "Nothing Playing")
                         : "Nothing Playing"
                     color: musicPlayer.fgColor
-                    font.family: "SF Pro Display"
+                    font.family: musicPlayer.textFont
                     font.pixelSize: 16
-                    font.bold: true
+                    font.weight: 600
                     elide: Text.ElideRight
                 }
 
@@ -213,12 +239,12 @@ Item {
                         : "Unknown Artist"
                     color: musicPlayer.accent
                     opacity: 0.75
-                    font.family: "SF Pro Display"
+                    font.family: musicPlayer.textFont
                     font.pixelSize: 14
+                    font.weight: 400
                     elide: Text.ElideRight
                 }
 
-                // ── Seek row ────────────────────────────────
                 RowLayout {
                     width: parent.width
                     spacing: 6
@@ -227,12 +253,11 @@ Item {
                         text: musicPlayer.formatTime(musicPlayer.displayPosition)
                         color: musicPlayer.accent
                         opacity: 0.75
-                        font.family: "SF Pro Display"
+                        font.family: musicPlayer.textFont
                         font.pixelSize: 11
                         font.weight: 500
                     }
 
-                    // Progress track — Rectangle directly in RowLayout
                     Rectangle {
                         id: progressTrack
                         Layout.fillWidth: true
@@ -243,7 +268,6 @@ Item {
                         color: "#cccccc"
                         opacity: 0.75
 
-                        // Finished portion — song title color
                         Rectangle {
                             width: progressTrack.width * musicPlayer.progress
                             height: progressTrack.height
@@ -252,7 +276,6 @@ Item {
                             opacity: 1.0
                         }
 
-                        // Seek hit area
                         MouseArea {
                             anchors.fill: parent
                             anchors.topMargin: -6
@@ -271,13 +294,12 @@ Item {
                         text: musicPlayer.formatTime(musicPlayer.length)
                         color: musicPlayer.accent
                         opacity: 0.75
-                        font.family: "SF Pro Display"
+                        font.family: musicPlayer.textFont
                         font.pixelSize: 11
                         font.weight: 500
                     }
                 }
 
-                // ── Controls — horizontally centered ────────
                 Row {
                     anchors.horizontalCenter: parent.horizontalCenter
                     spacing: 20
@@ -287,7 +309,7 @@ Item {
                         color: musicPlayer.fgColor
                         opacity: musicPlayer.spotifyPlayer
                                  && musicPlayer.spotifyPlayer.canGoPrevious ? 1 : 0.3
-                        font.family: "JetBrainsMono Nerd Font"
+                        font.family: musicPlayer.iconFont
                         font.pixelSize: 20
 
                         MouseArea {
@@ -304,7 +326,7 @@ Item {
                     Text {
                         text: musicPlayer.isPlaying ? "󰏤" : "󰐊"
                         color: musicPlayer.fgColor
-                        font.family: "JetBrainsMono Nerd Font"
+                        font.family: musicPlayer.iconFont
                         font.pixelSize: 20
 
                         MouseArea {
@@ -322,7 +344,7 @@ Item {
                         color: musicPlayer.fgColor
                         opacity: musicPlayer.spotifyPlayer
                                  && musicPlayer.spotifyPlayer.canGoNext ? 1 : 0.3
-                        font.family: "JetBrainsMono Nerd Font"
+                        font.family: musicPlayer.iconFont
                         font.pixelSize: 20
 
                         MouseArea {
@@ -339,14 +361,11 @@ Item {
             }
         }
 
-        // ════════════════════════════════════════════════════════
-        //  COLLAPSED — small circle album
-        // ════════════════════════════════════════════════════════
         Item {
             id: collapsedAlbum
             z: 1
-            width: 31
-            height: 31
+            width: 27
+            height: 27
             anchors.left: parent.left
             anchors.top: parent.top
             anchors.leftMargin: 3
@@ -368,9 +387,9 @@ Item {
                     anchors.centerIn: parent
                     text: "♪"
                     color: musicPlayer.fgColor
-                    font.family: "SF Pro Display"
-                    font.pixelSize: 14
-                    font.weight: 600
+                    font.family: musicPlayer.textFont
+                    font.pixelSize: 12
+                    font.weight: 500
                 }
             }
 
@@ -383,8 +402,8 @@ Item {
                 smooth: true
                 asynchronous: true
                 cache: true
-                sourceSize.width: 62
-                sourceSize.height: 62
+                sourceSize.width: 54
+                sourceSize.height: 54
 
                 layer.enabled: true
                 layer.effect: OpacityMask {
